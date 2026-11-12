@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小小餐厅点餐记 Little Restaurant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: "Comic Sans MS", "Chalkboard SE", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: linear-gradient(160deg, #fff6e6 0%, #ffe3c7 45%, #ffd2b6 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    color: #4a2c17;
+    user-select: none;
+  }
+
+  #app { width: 100%; max-width: 980px; }
+
+  .screen { display: none; }
+  .screen.active { display: block; animation: fadeIn .35s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px);} to { opacity: 1; transform: none;} }
+
+  /* ---------- 开始 / 结果 ---------- */
+  .start-card {
+    background: #fffdf8;
+    border-radius: 26px;
+    padding: 32px 24px 28px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(190, 120, 60, .22);
+    border: 5px solid #fff;
+    max-width: 640px;
+    margin: 40px auto;
+  }
+  .start-card h1 { font-size: 32px; color: #e2681f; line-height: 1.2; }
+  .start-card .sub { font-size: 19px; color: #a5642f; margin-top: 6px; letter-spacing: 2px; }
+  .start-card .desc { font-size: 16px; color: #8a6a52; margin: 20px 0 12px; line-height: 1.7; }
+  .start-card .tip { font-size: 14px; color: #b08d74; margin-top: 18px; line-height: 1.7; }
+
+  .role-pick { display: flex; gap: 16px; justify-content: center; margin-bottom: 22px; flex-wrap: wrap; }
+  .role-btn {
+    font-family: inherit; cursor: pointer;
+    background: #fff8ee; border: 3px solid #ffd8b4; border-radius: 20px;
+    padding: 16px 26px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: .18s; min-width: 130px;
+  }
+  .role-btn:hover { transform: translateY(-3px); }
+  .role-btn.selected { border-color: #ff8c42; background: #fff0df; box-shadow: 0 0 0 4px #ffe2c6 inset; }
+  .role-emoji { font-size: 42px; line-height: 1; }
+  .role-en { font-size: 17px; font-weight: 700; color: #c0561a; }
+  .role-zh { font-size: 13px; color: #a5866f; }
+
+  .big-stars { font-size: 40px; margin: 16px 0; letter-spacing: 6px; }
+
+  /* ---------- 按钮 ---------- */
+  .btn {
+    font-family: inherit; font-size: 17px; font-weight: 700;
+    border: none; border-radius: 16px; padding: 13px 30px; cursor: pointer;
+    transition: .12s;
+  }
+  .btn.primary {
+    background: linear-gradient(#ff9f52, #ff7a26); color: #fff;
+    box-shadow: 0 5px 0 #d15c14;
+  }
+  .btn.primary:active { transform: translateY(4px); box-shadow: 0 1px 0 #d15c14; }
+  .btn.ghost { background: #fff; color: #b0692f; border: 3px solid #ffd5b0; }
+  .btn.ghost:active { transform: translateY(2px); }
+  .btn.big { font-size: 19px; padding: 15px 42px; }
+
+  .result-actions {
+    display: flex; gap: 14px; justify-content: center;
+    flex-wrap: wrap; margin-top: 6px;
+  }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; padding: 0 4px;
+  }
+  .hud-item {
+    background: #fff; border-radius: 14px; padding: 8px 16px;
+    font-size: 16px; font-weight: 700; color: #c0561a;
+    box-shadow: 0 3px 0 #f0d5bb;
+  }
+  .hud-item:first-child { font-size: 18px; }
+  .hud-btn {
+    margin-left: auto; background: #fff; border: none; border-radius: 14px;
+    font-size: 20px; width: 46px; height: 44px; cursor: pointer;
+    box-shadow: 0 3px 0 #f0d5bb;
+  }
+  .hud-btn.home { margin-left: 0; font-size: 18px; }
+
+  /* ---------- 场景 ---------- */
+  .scene {
+    background: linear-gradient(#fffaf2, #ffeada);
+    border: 5px solid #fff;
+    border-radius: 24px;
+    padding: 16px;
+    box-shadow: 0 8px 26px rgba(190, 120, 60, .18);
+    margin-bottom: 12px;
+  }
+
+  .bubble {
+    background: #fff;
+    border: 3px solid #ffb27a;
+    border-radius: 20px;
+    padding: 12px 54px 12px 18px;
+    position: relative;
+    min-height: 62px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 0 #ffe0c8;
+  }
+  .bubble::after {
+    content: ""; position: absolute; left: 50%; bottom: -13px;
+    transform: translateX(-50%);
+    border: 8px solid transparent; border-top-color: #ffb27a;
+  }
+  .bubble-text { text-align: center; }
+  .bubble-text .en-line {
+    font-size: clamp(15px, 3vw, 21px);
+    font-weight: 700; color: #c2410c; line-height: 1.4;
+  }
+  .bubble-text .zh-line {
+    font-size: clamp(11px, 2.2vw, 14px);
+    color: #b08d74; margin-top: 5px; font-weight: 400; line-height: 1.5;
+  }
+  .replay-btn {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: #fff2e3; border: 2px solid #ffd0a8; border-radius: 50%;
+    width: 38px; height: 38px; font-size: 17px; cursor: pointer;
+  }
+  .replay-btn:active { transform: translateY(-50%) scale(.92); }
+
+  .scene-row {
+    display: flex; align-items: flex-end; justify-content: space-around;
+    gap: 10px; margin-top: 22px;
+  }
+  .avatar { font-size: clamp(38px, 9vw, 60px); line-height: 1; animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
+
+  .table { display: flex; flex-direction: column; align-items: center; }
+  .tabletop {
+    min-width: 220px; min-height: 92px;
+    background: repeating-linear-gradient(45deg, #f0bb85, #f0bb85 12px, #e8ad74 12px, #e8ad74 24px);
+    border: 4px solid #b4713a;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; padding: 10px 14px; flex-wrap: wrap;
+    box-shadow: inset 0 -7px 0 rgba(0,0,0,.09);
+    transition: .15s;
+  }
+  .tabletop.shake { animation: shake .38s; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    50% { transform: translateX(8px); }
+    80% { transform: translateX(-4px); }
+  }
+  .tabletop.flash { box-shadow: inset 0 -7px 0 rgba(0,0,0,.09), 0 0 0 6px #b8f0cc; }
+  .tray-hint { color: #8a5a30; font-size: 14px; opacity: .7; font-weight: 700; }
+  .tray-item {
+    font-size: clamp(26px, 5.6vw, 36px); line-height: 1; cursor: pointer;
+    animation: pop .22s ease; transition: transform .12s;
+  }
+  .tray-item:hover { transform: scale(1.15) rotate(-6deg); }
+  @keyframes pop { from { transform: scale(.4); } to { transform: scale(1); } }
+  .table-leg {
+    width: 44px; height: 18px; background: #b4713a;
+    border-radius: 0 0 8px 8px;
+  }
+
+  /* ---------- 菜单标题栏 & 提示按钮 ---------- */
+  .menu-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px; margin-bottom: 8px; gap: 10px; flex-wrap: wrap;
+  }
+  .menu-title { font-size: 16px; font-weight: 700; color: #b0692f; }
+  .hint-toggle {
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    background: #fff; color: #b0692f; border: 3px solid #ffd5b0;
+    border-radius: 14px; padding: 7px 14px; cursor: pointer;
+    transition: .15s; white-space: nowrap;
+    box-shadow: 0 3px 0 #f0d5bb;
+  }
+  .hint-toggle:active { transform: translateY(2px); box-shadow: 0 1px 0 #f0d5bb; }
+  .hint-toggle.on {
+    background: #fff4d8; color: #b07b00; border-color: #ffcf66;
+    box-shadow: 0 3px 0 #f0c46a;
+  }
+  .hint-toggle b { font-weight: 800; }
+
+  /* ---------- 菜单 ---------- */
+  .menu-board {
+    background: #fffdf8;
+    border: 5px solid #fff;
+    border-radius: 22px;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    box-shadow: 0 8px 26px rgba(190, 120, 60, .16);
+    margin-bottom: 12px;
+  }
+  .food {
+    font-family: inherit; cursor: pointer;
+    background: #fffaf2; border: 3px solid #ffe2c6; border-radius: 14px;
+    padding: 8px 4px 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    transition: .13s;
+  }
+  .food:hover { transform: translateY(-4px); box-shadow: 0 7px 16px rgba(200, 120, 60, .22); }
+  .food:active { transform: translateY(-1px); }
+  .food .emoji { font-size: clamp(22px, 4.6vw, 30px); line-height: 1.1; }
+  .food .en {
+    font-size: clamp(10px, 2vw, 12.5px);
+    font-weight: 700;
+    line-height: 1.15;
+    text-align: center;
+    position: relative;
+    min-height: 1.2em;
+    color: transparent;      /* 默认隐藏英文，但保留占位不跳动 */
+    transition: color .2s;
+  }
+  .food .en::before {
+    content: "?";
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #d9b999;
+    font-size: 12px;
+    transition: opacity .2s;
+  }
+  .menu-board.hint-on .food .en { color: #7c3d0e; }
+  .menu-board.hint-on .food .en::before { opacity: 0; }
+
+  .food .zh { font-size: 10px; color: #b09a87; }
+  .food.in-tray {
+    border-color: #3cb371; background: #ecfdf3;
+    box-shadow: 0 0 0 3px #b8f0cc inset;
+  }
+
+  /* ---------- 操作区 ---------- */
+  .actions { display: flex; gap: 14px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+  #serveBtn { min-width: 200px; }
+  .feedback {
+    text-align: center; font-size: 17px; font-weight: 700;
+    min-height: 26px; line-height: 1.4;
+  }
+  .feedback.ok { color: #159c52; }
+  .feedback.bad { color: #e0603a; }
+
+  @media (max-width: 700px) {
+    .menu-board { grid-template-columns: repeat(4, 1fr); }
+    .tabletop { min-width: 150px; min-height: 78px; }
+    .start-card h1 { font-size: 26px; }
+    .btn { padding: 12px 22px; font-size: 16px; }
+    .result-actions .btn { flex: 1 1 100%; }
+    #serveBtn { min-width: 0; flex: 1; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ========== 开始界面 ========== -->
+  <section class="screen active" id="startScreen">
+    <div class="start-card">
+      <h1>🍽️ Little Restaurant</h1>
+      <p class="sub">小 小 餐 厅 点 餐 记</p>
+      <p class="desc">Choose your role 选择你的角色</p>
+      <div class="role-pick">
+        <button class="role-btn" data-role="waiter">
+          <span class="role-emoji">🤵</span>
+          <span class="role-en">Waiter</span>
+          <span class="role-zh">男服务员</span>
+        </button>
+        <button class="role-btn" data-role="waitress">
+          <span class="role-emoji">💁‍♀️</span>
+          <span class="role-en">Waitress</span>
+          <span class="role-zh">女服务员</span>
+        </button>
+      </div>
+      <button class="btn primary big" id="startBtn">Start 开始点餐</button>
+      <p class="tip">💡 共 3 轮：第 1 轮点 1 样，第 2 轮点 2 样，第 3 轮点 3 样<br>
+      3 轮结束后换下一位小朋友上台 ✨<br>
+      菜单默认只显示中文，需要时点亮「提示 Hint」查看英文</p>
+    </div>
+  </section>
+
+  <!-- ========== 游戏界面 ========== -->
+  <section class="screen" id="gameScreen">
+    <header class="hud">
+      <div class="hud-item">⭐ <span id="stars">0</span></div>
+      <div class="hud-item">Round <span id="roundNum">1</span> / 3</div>
+      <button class="hud-btn home" id="homeBtn" title="回到首页">🏠</button>
+      <button class="hud-btn" id="soundBtn" title="声音开关">🔊</button>
+    </header>
+
+    <div class="scene">
+      <div class="bubble">
+        <div class="bubble-text" id="bubbleText"></div>
+        <button class="replay-btn" id="replayBtn" title="再听一遍">🔊</button>
+      </div>
+      <div class="scene-row">
+        <div class="avatar" id="customerAvatar">🧒</div>
+        <div class="table">
+          <div class="tabletop" id="tray"></div>
+          <div class="table-leg"></div>
+        </div>
+        <div class="avatar" id="waiterAvatar">🤵</div>
+      </div>
+    </div>
+
+    <div class="menu-head">
+      <span class="menu-title">📋 Menu 菜单</span>
+      <button class="hint-toggle" id="hintBtn">💡 提示 Hint <b id="hintState">OFF</b></button>
+    </div>
+    <div class="menu-board" id="menuBoard"></div>
+
+    <div class="actions">
+      <button class="btn ghost" id="clearBtn">Clear 清空</button>
+      <button class="btn primary" id="serveBtn">Here you are</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+  </section>
+
+  <!-- ========== 结果界面 ========== -->
+  <section class="screen" id="resultScreen">
+    <div class="start-card">
+      <h1 id="resultTitle">🎉 Great Job!</h1>
+      <div class="big-stars" id="resultStars">⭐⭐⭐</div>
+      <p class="desc" id="resultText"></p>
+      <div class="result-actions">
+        <button class="btn ghost big" id="homeBtn2">🏠 回到首页 Home</button>
+        <button class="btn primary big" id="againBtn">换小朋友 Play Again</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ==================== 数据 ==================== */
+const FOODS = [
+  { id:'coffee',       en:'coffee',        zh:'咖啡',       unit:'一杯咖啡',       emoji:'☕',  art:''   },
+  { id:'chocolatemilk',en:'chocolate milk',zh:'巧克力牛奶', unit:'一杯巧克力牛奶', emoji:'🍫',  art:''   },
+  { id:'milk',         en:'milk',          zh:'牛奶',       unit:'一杯牛奶',       emoji:'🥛',  art:''   },
+  { id:'juice',        en:'juice',         zh:'果汁',       unit:'一杯果汁',       emoji:'🧃',  art:''   },
+  { id:'water',        en:'water',         zh:'水',         unit:'一杯水',         emoji:'💧',  art:''   },
+  { id:'pizza',        en:'pizza',         zh:'披萨',       unit:'一份披萨',       emoji:'🍕',  art:''   },
+  { id:'noodles',      en:'noodles',       zh:'面条',       unit:'一份面条',       emoji:'🍜',  art:''   },
+  { id:'friedrice',    en:'fried rice',    zh:'炒饭',       unit:'一份炒饭',       emoji:'🍚',  art:''   },
+  { id:'fries',        en:'fries',         zh:'薯条',       unit:'一份薯条',       emoji:'🍟',  art:''   },
+  { id:'hamburger',    en:'hamburger',     zh:'汉堡',       unit:'一个汉堡',       emoji:'🍔',  art:'a ' },
+  { id:'hotdog',       en:'hot dog',       zh:'热狗',       unit:'一个热狗',       emoji:'🌭',  art:'a ' },
+  { id:'cake',         en:'cake',          zh:'蛋糕',       unit:'一个蛋糕',       emoji:'🍰',  art:'a ' }
+];
+
+const CUSTOMERS = ['🧒','👦','👧','🧑','👩','👨','👵','👴','🧕','👩‍🦰'];
+const ROUNDS = 3;
+const MAX_TRAY = 5;
+
+/* ==================== 状态 ==================== */
+const state = {
+  role: 'waiter',
+  soundOn: true,
+  showHint: false,     // 提示开关：false 只显示中文，true 显示英文
+  round: 0,
+  stars: 0,
+  order: [],
+  tray: [],
+  sentence: '',
+  zhSentence: '',
+  tries: 0,
+  locked: false
+};
+
+const $ = id => document.getElementById(id);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const foodById = id => FOODS.find(f => f.id === id);
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ==================== 声音 ==================== */
+let audioCtx = null;
+function beep(freq, dur, type, delay) {
+  if (!state.soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    const t = audioCtx.currentTime + (delay || 0);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+const playSuccess = () => { beep(660, .12); beep(880, .12, 'sine', .11); beep(1180, .22, 'sine', .22); };
+const playError   = () => { beep(320, .14, 'square'); beep(230, .2, 'square', .13); };
+
+function speak(text, rate, lang) {
+  if (!state.soundOn || !('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang || 'en-US';
+    u.rate = rate || 0.82;
+    u.pitch = 1.08;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+function stopSpeaking() {
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
+/* ==================== 生成点餐句子 ==================== */
+function joinEn(parts) {
+  if (parts.length === 1) return parts[0];
+  if (parts.length === 2) return parts[0] + ' and ' + parts[1];
+  return parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+}
+
+function joinZh(parts) {
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, -1).join('、') + '和' + parts[parts.length - 1];
+}
+
+function buildOrderSentence(items) {
+  const style = Math.random() < 0.5 ? 'can' : 'forMe';
+
+  if (style === 'can') {
+    const list = joinEn(items.map(f => f.art + f.en));
+    return {
+      en: `Can I have ${list}, please?`,
+      zh: `我可以要${joinZh(items.map(f => f.unit))}吗？`
+    };
+  } else {
+    let list = joinEn(items.map(f => f.en));
+    list = list.charAt(0).toUpperCase() + list.slice(1);
+    return {
+      en: `${list} for me, please.`,
+      zh: `请给我${joinZh(items.map(f => f.unit))}。`
+    };
+  }
+}
+
+/* ==================== 初始化 ==================== */
+function init() {
+  // 生成菜单
+  const board = $('menuBoard');
+  FOODS.forEach(f => {
+    const b = document.createElement('button');
+    b.className = 'food';
+    b.dataset.id = f.id;
+    b.innerHTML = `<span class="emoji">${f.emoji}</span>
+                   <span class="en">${f.en}</span>
+                   <span class="zh">${f.zh}</span>`;
+    b.addEventListener('click', () => pickFood(f));
+    board.appendChild(b);
+  });
+
+  // 角色选择
+  const roleBtns = document.querySelectorAll('.role-btn');
+  roleBtns.forEach(b => {
+    b.addEventListener('click', () => {
+      roleBtns.forEach(x => x.classList.remove('selected'));
+      b.classList.add('selected');
+      state.role = b.dataset.role;
+    });
+  });
+  roleBtns[0].classList.add('selected');
+
+  // 按钮
+  $('startBtn').addEventListener('click', startGame);
+  $('againBtn').addEventListener('click', startGame);
+  $('homeBtn').addEventListener('click', goHome);
+  $('homeBtn2').addEventListener('click', goHome);
+  $('serveBtn').addEventListener('click', checkOrder);
+  $('clearBtn').addEventListener('click', () => {
+    if (state.locked) return;
+    state.tray = [];
+    renderTray();
+  });
+  $('replayBtn').addEventListener('click', speakBubble);
+  $('soundBtn').addEventListener('click', toggleSound);
+  $('hintBtn').addEventListener('click', toggleHint);
+
+  syncHintUI();
+}
+
+/* ---------- 提示按钮 ---------- */
+function toggleHint() {
+  state.showHint = !state.showHint;
+  syncHintUI();
+  // 切换时给一点小音效反馈
+  beep(state.showHint ? 880 : 520, .1, 'sine');
+}
+
+function syncHintUI() {
+  $('menuBoard').classList.toggle('hint-on', state.showHint);
+  $('hintBtn').classList.toggle('on', state.showHint);
+  $('hintState').textContent = state.showHint ? 'ON' : 'OFF';
+}
+
+function toggleSound() {
+  state.soundOn = !state.soundOn;
+  $('soundBtn').textContent = state.soundOn ? '🔊' : '🔇';
+  if (!state.soundOn) stopSpeaking();
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+/* ==================== 回到首页 ==================== */
+function goHome() {
+  stopSpeaking();
+  state.round = 0;
+  state.stars = 0;
+  state.tray = [];
+  state.order = [];
+  state.tries = 0;
+  state.locked = false;
+
+  $('stars').textContent = '0';
+  $('roundNum').textContent = '1';
+  $('feedback').textContent = '';
+  $('feedback').className = 'feedback';
+  $('tray').classList.remove('flash', 'shake');
+  renderTray();
+
+  document.querySelectorAll('.role-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.role === state.role);
+  });
+
+  showScreen('startScreen');
+}
+
+/* ==================== 游戏流程 ==================== */
+function startGame() {
+  stopSpeaking();
+  state.round = 0;
+  state.stars = 0;
+  state.tray = [];
+  $('stars').textContent = '0';
+  showScreen('gameScreen');
+  nextRound();
+}
+
+function nextRound() {
+  state.round++;
+  if (state.round > ROUNDS) { showResult(); return; }
+
+  state.tray = [];
+  state.tries = 0;
+  state.locked = false;
+  setFeedback('', '');
+
+  const count = Math.min(state.round, 4);
+  state.order = shuffle(FOODS.slice()).slice(0, count);
+
+  const built = buildOrderSentence(state.order);
+  state.sentence = built.en;
+  state.zhSentence = built.zh;
+
+  $('customerAvatar').textContent = pick(CUSTOMERS);
+  $('waiterAvatar').textContent = state.role === 'waiter' ? '🤵' : '💁‍♀️';
+
+  $('bubbleText').innerHTML =
+    `<div class="en-line">${state.sentence}</div>` +
+    `<div class="zh-line">${state.zhSentence}</div>`;
+
+  $('roundNum').textContent = state.round;
+  $('tray').classList.remove('flash');
+  renderTray();
+
+  setTimeout(speakBubble, 350);
+}
+
+function speakBubble() {
+  speak(state.sentence);
+}
+
+/* ==================== 交互 ==================== */
+function pickFood(f) {
+  if (state.locked) return;
+
+  // 再点一次 = 取消
+  if (state.tray.includes(f.id)) {
+    state.tray = state.tray.filter(i => i !== f.id);
+    renderTray();
+    beep(440, .07, 'sine');
+    return;
+  }
+
+  if (state.tray.length >= MAX_TRAY) {
+    setFeedback(`Tray is full! 托盘最多 ${MAX_TRAY} 样`, 'bad');
+    return;
+  }
+
+  state.tray.push(f.id);
+
+  // 打开提示时才读英文；默认只给一个轻音效，避免直接泄露答案
+  if (state.showHint) {
+    speak(f.en, 0.9, 'en-US');
+  } else {
+    beep(720, .07, 'sine');
+  }
+
+  renderTray();
+}
+
+function renderTray() {
+  const tray = $('tray');
+  tray.innerHTML = '';
+
+  if (state.tray.length === 0) {
+    tray.innerHTML = '<span class="tray-hint">Tray 托盘</span>';
+  } else {
+    state.tray.forEach(id => {
+      const f = foodById(id);
+      const el = document.createElement('span');
+      el.className = 'tray-item';
+      el.textContent = f.emoji;
+      el.title = state.showHint ? (f.en + ' / ' + f.zh) : f.zh;
+      el.addEventListener('click', () => {
+        if (state.locked) return;
+        state.tray = state.tray.filter(i => i !== id);
+        renderTray();
+      });
+      tray.appendChild(el);
+    });
+  }
+
+  document.querySelectorAll('.food').forEach(b => {
+    b.classList.toggle('in-tray', state.tray.includes(b.dataset.id));
+  });
+}
+
+/* ==================== 判断上菜 ==================== */
+function checkOrder() {
+  if (state.locked) return;
+
+  if (state.tray.length === 0) {
+    setFeedback('Pick some food first! 先选食物哦', 'bad');
+    return;
+  }
+
+  const need = state.order.map(f => f.id).sort();
+  const have = state.tray.slice().sort();
+  const correct = need.length === have.length && need.every((v, i) => v === have[i]);
+
+  if (correct) {
+    state.locked = true;
+    const gained = state.tries === 0 ? 2 : 1;
+    state.stars += gained;
+    $('stars').textContent = state.stars;
+
+    $('tray').classList.add('flash');
+    setFeedback(`✔ Here you are! 太棒了！ +${gained} ⭐`, 'ok');
+    playSuccess();
+    speak('Here you are. Enjoy your meal!', 0.9);
+
+    setTimeout(nextRound, 2400);
+
+  } else {
+    state.tries++;
+    const extras  = have.filter(id => !need.includes(id));
+    const missing = need.filter(id => !have.includes(id));
+
+    let msg = '✘ Try again! 再试一次';
+    if (extras.length > 0)       msg = '✘ The customer did not order that. 点多了哦';
+    else if (missing.length > 0) msg = '✘ Something is missing. 还差一点哦';
+
+    setFeedback(msg, 'bad');
+    playError();
+
+    const tray = $('tray');
+    tray.classList.remove('shake');
+    void tray.offsetWidth;
+    tray.classList.add('shake');
+
+    speak('Let us listen again.');
+    setTimeout(speakBubble, 1200);
+  }
+}
+
+function setFeedback(text, type) {
+  const el = $('feedback');
+  el.textContent = text;
+  el.className = 'feedback' + (type ? ' ' + type : '');
+}
+
+/* ==================== 结算 ==================== */
+function showResult() {
+  showScreen('resultScreen');
+
+  const maxStars = ROUNDS * 2;
+  const pct = state.stars / maxStars;
+
+  let title, desc, starStr;
+  if (pct >= 0.84) {
+    title = '🏆 Top Waiter / Waitress!';
+    desc = `完美！你获得了 ${state.stars} / ${maxStars} 颗星，是金牌服务员！`;
+    starStr = '⭐⭐⭐⭐⭐';
+  } else if (pct >= 0.5) {
+    title = '🥈 Great Job!';
+    desc = `非常棒！你获得了 ${state.stars} / ${maxStars} 颗星，再接再厉！`;
+    starStr = '⭐⭐⭐⭐';
+  } else {
+    title = '🥉 Good Try!';
+    desc = `你获得了 ${state.stars} / ${maxStars} 颗星。再试一次，一定会更棒！`;
+    starStr = '⭐⭐⭐';
+  }
+
+  $('resultTitle').textContent = title;
+  $('resultStars').textContent = starStr;
+  $('resultText').innerHTML = desc +
+    `<br><br><span style="color:#c0561a;font-weight:700;">👉 换下一位小朋友上台吧！</span>`;
+
+  playSuccess();
+  speak('Great job! Next friend, please!', 0.9);
+}
+
+/* ==================== 启动 ==================== */
+init();
+</script>
+</body>
+</html>
